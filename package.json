@@ -1,10 +1,15 @@
 {
   "name": "bitcoin-inventory",
   "version": "0.0.0",
-  "description": "Relay and store data received from peers",
+  "description": "Relay and store transactions received from peers",
   "main": "index.js",
   "scripts": {
-    "test": "standard src test && nyc tape test/*.js | faucet && nyc report"
+    "test": "standard src test && nyc tape test/*.js | faucet && nyc report",
+    "test-browser": "npm run build && test/browser.sh && npm run source",
+    "build": "rm -rf lib && babel --presets es2015 src -d lib",
+    "source": "rm -rf lib && ln -s src lib",
+    "prepublish": "npm run build",
+    "publish": "npm run source"
   },
   "keywords": [
     "webcoin",
@@ -25,9 +30,13 @@
     "old": "^0.1.3"
   },
   "devDependencies": {
+    "babel-cli": "^6.9.0",
+    "babel-preset-es2015": "^6.9.0",
     "faucet": "0.0.1",
     "nyc": "^6.4.4",
     "standard": "^7.1.1",
-    "tape": "^4.5.1"
+    "tape": "^4.5.1",
+    "zuul": "^3.10.1",
+    "zuul-ngrok": "^4.0.0"
   }
 }
