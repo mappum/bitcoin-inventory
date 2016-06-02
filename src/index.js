@@ -33,9 +33,9 @@ class Inventory extends EventEmitter {
     if (err) this.emit('error', err)
   }
 
-  _onInv (items, peer) {
+  _onInv (items, peer = this.peer) {
     var getData = []
-    for (let item in items) {
+    for (let item of items) {
       if (item.type !== INV.MSG_TX) continue
       let hash = getHash(item.hash)
       if (this.requesting[hash] || this.data.has(hash)) continue
@@ -47,13 +47,13 @@ class Inventory extends EventEmitter {
     }
   }
 
-  _onTx (tx, peer) {
+  _onTx (tx, peer = this.peer) {
     var hash = getHash(tx.getHash())
     delete this.requesting[hash]
     if (this.data.has(hash)) return
     this._add(tx, false, (err, valid) => {
       if (err) return this._error(err)
-      if (!valid) return
+      if (this.verify && !valid) return
       this.emit('tx', tx, peer)
       this.emit(`tx:${hash}`, tx, peer)
     })
@@ -97,7 +97,7 @@ class Inventory extends EventEmitter {
   }
 
   close () {
-    clearInterval(this.inverval)
+    clearInterval(this.interval)
   }
 }
 
