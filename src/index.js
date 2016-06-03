@@ -26,6 +26,7 @@ class Inventory extends EventEmitter {
 
     this.lastCount = 0
     this.interval = setInterval(this._removeOld.bind(this), ttl)
+    if (this.interval.unref) this.interval.unref()
   }
 
   _onInv (items, peer = this.peers) {
