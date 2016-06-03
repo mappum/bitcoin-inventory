@@ -268,11 +268,11 @@ test('expiration', function (t) {
     peer.emit('tx', tx3)
     t.equals(inv.get(hash3), tx3, 'inv has tx3')
     setTimeout(function () {
-      t.notOk(inv.get(hash), tx, 'tx removed')
-      t.notOk(inv.get(hash2), tx2, 'tx2 removed')
+      t.notOk(inv.get(hash), 'tx removed')
+      t.notOk(inv.get(hash2), 'tx2 removed')
       t.equals(inv.get(hash3), tx3, 'inv still has tx3')
       setTimeout(function () {
-        t.notOk(inv.get(hash3), tx3, 'tx3 removed')
+        t.notOk(inv.get(hash3), 'tx3 removed')
         inv.close()
         t.end()
       }, ttl + 10)
