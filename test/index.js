@@ -120,6 +120,11 @@ test('tx handling', function (t) {
       t.pass('emitted "tx" event')
       t.equal(tx2, tx, 'got tx')
       t.equal(peer2, peer, 'got peer')
+      peerEvents.removeAll()
+      peerEvents.once('send', function (command, message) {
+        t.fail('should not have sent message')
+      })
+      peer.emit('getdata', [{ hash: hash, type: INV.MSG_TX }])
     })
     invEvents.once('tx:' + hash.toString('hex'), function (tx2, peer2) {
       t.pass('emitted "tx:<hash>" event')
@@ -166,6 +171,11 @@ test('tx handling', function (t) {
       t.pass('emitted "tx" event')
       t.equal(tx2, tx, 'got tx')
       t.equal(peer2, peer, 'got peer')
+
+      peerEvents.once('send', function (command, message) {
+        t.fail('should not have sent message')
+      })
+      peer.emit('getdata', [{ hash: hash, type: INV.MSG_TX }])
       t.end()
     })
     peer.emit('inv', [{ hash: hash, type: INV.MSG_TX }])
@@ -178,38 +188,55 @@ test('tx handling', function (t) {
   })
 })
 
-test('direct add', function (t) {
+test('broadcast', function (t) {
   var peer = new MockPeer()
   var inv = new Inventory(peer)
 
   var hash = Buffer(32).fill('a')
   var tx = { getHash: function () { return hash } }
-  var hash2 = Buffer(32).fill('b')
-  var tx2 = { getHash: function () { return hash2 } }
 
-  t.test('add and announce', function (t) {
+  t.test('broadcast', function (t) {
     peer.once('send', function (command, message) {
       t.equal(command, 'inv', 'sent inv')
       t.equal(message.length, 1, 'message has length 1')
       t.equal(message[0].hash.toString('hex'), hash.toString('hex'), 'correct hash')
       t.end()
     })
-    inv.add(tx)
+    inv.broadcast(tx)
   })
 
-  t.test('add without announce', function (t) {
+  t.test('respond to getdata', function (t) {
+    peer.once('send', function (command, message) {
+      t.equal(command, 'tx', 'sent tx message')
+      t.equal(message, tx, 'correct tx')
+      t.end()
+    })
+    peer.emit('getdata', [{ hash: hash, type: INV.MSG_TX }])
+  })
+
+  t.test('broadcast existing tx', function (t) {
+    peer.once('send', function (command, message) {
+      t.equal(command, 'inv', 'sent inv')
+      t.equal(message.length, 1, 'message has length 1')
+      t.equal(message[0].hash.toString('hex'), hash.toString('hex'), 'correct hash')
+      t.end()
+    })
+    inv.broadcast(tx)
+  })
+
+  t.test('getdata with wrong type', function (t) {
     peer.once('send', function (command, message) {
       t.fail('should not have sent message')
     })
-    inv.add(tx2, false)
+    peer.emit('getdata', [{ hash: hash, type: INV.MSG_BLOCK }])
     t.end()
   })
 
-  t.test('add duplicate', function (t) {
+  t.test('getdata with wrong hash', function (t) {
     peer.once('send', function (command, message) {
       t.fail('should not have sent message')
     })
-    inv.add(tx)
+    peer.emit('getdata', [{ hash: Buffer(32).fill('b'), type: INV.MSG_TX }])
     t.end()
   })
 
@@ -251,6 +278,20 @@ test('expiration', function (t) {
       }, ttl + 10)
     }, ttl + 10)
   }, ttl + 10)
+})
+
+test('get', function (t) {
+  var peer = new MockPeer()
+  var inv = new Inventory(peer)
+  t.test('get nonexistent tx', function (t) {
+    t.notOk(inv.get(Buffer(32).fill('a')), 'no tx returned')
+    t.end()
+  })
+  t.test('close', function (t) {
+    inv.close()
+    t.end()
+  })
+  t.end()
 })
 
 function MockPeer () {

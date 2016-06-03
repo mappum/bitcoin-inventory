@@ -1,7 +1,7 @@
 {
   "name": "bitcoin-inventory",
   "version": "0.0.0",
-  "description": "Relay and store transactions received from peers",
+  "description": "Exchange transactions with peers",
   "main": "index.js",
   "scripts": {
     "test": "standard src test && nyc tape test/*.js | faucet && nyc report",

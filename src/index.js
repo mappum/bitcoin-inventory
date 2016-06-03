@@ -7,6 +7,7 @@ var old = require('old')
 var reverse = require('buffer-reverse')
 
 // TODO: prevent DoS (e.g. rate limiting, cap on stored data)
+// TODO: add optional tx verification (user-provided function), and broadcast valid txs
 
 class Inventory extends EventEmitter {
   constructor (peers, opts = {}) {
@@ -21,6 +22,7 @@ class Inventory extends EventEmitter {
 
     this.peers.on('inv', this._onInv.bind(this))
     this.peers.on('tx', this._onTx.bind(this))
+    this.peers.on('getdata', this._onGetdata.bind(this))
 
     this.lastCount = 0
     this.interval = setInterval(this._removeOld.bind(this), ttl)
@@ -44,9 +46,20 @@ class Inventory extends EventEmitter {
     var hash = getHash(tx.getHash())
     delete this.requesting[hash]
     if (this.data.has(hash)) return
-    this.add(tx, false)
+    this._add(tx, false)
     this.emit('tx', tx, peer)
     this.emit(`tx:${hash}`, tx, peer)
+  }
+
+  _onGetdata (items, peer = this.peers) {
+    for (let item of items) {
+      if (item.type !== INV.MSG_TX) continue
+      let hash = getHash(item.hash)
+      if (!this.data.has(hash)) continue
+      let entry = this.data.get(hash)
+      if (!entry.broadcast) continue
+      peer.send('tx', this.data.get(hash).tx)
+    }
   }
 
   _removeOld () {
@@ -56,18 +69,30 @@ class Inventory extends EventEmitter {
     this.lastCount = this.data.length
   }
 
-  add (data, announce = true) {
-    var hash = getHash(data.getHash())
-    if (this.data.has(hash)) return
-    this.data.push(hash, data)
-    if (!announce) return
-    this.peers.send('inv', [
-      { hash: data.getHash(), type: INV.MSG_TX }
+  _add (tx, broadcast) {
+    var hashBuf = tx.getHash()
+    var hash = getHash(hashBuf)
+    if (!this.data.has(hash)) {
+      this.data.push(hash, { tx, broadcast })
+    } else {
+      this.data.get(hash).broadcast = true
+    }
+  }
+
+  broadcast (tx) {
+    this._add(tx, true)
+    this._sendInv(tx, this.peers)
+  }
+
+  _sendInv (tx, peer) {
+    peer.send('inv', [
+      { hash: tx.getHash(), type: INV.MSG_TX }
     ])
   }
 
   get (hash) {
-    return this.data.get(getHash(hash))
+    var entry = this.data.get(getHash(hash))
+    if (entry) return entry.tx
   }
 
   close () {
