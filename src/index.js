@@ -97,6 +97,7 @@ class Inventory extends EventEmitter {
 
   close () {
     clearInterval(this.interval)
+    // TODO: stop listening to peers
   }
 }
 
