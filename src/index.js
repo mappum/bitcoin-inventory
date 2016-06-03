@@ -15,12 +15,9 @@ class Inventory extends EventEmitter {
     }
     super()
     var ttl = opts.ttl != null ? opts.ttl : 2 * 60 * 1000
-    this.verify = opts.verify
     this.peers = peers
     this.data = new MapDeque()
     this.requesting = {}
-
-    this._error = this._error.bind(this)
 
     this.peers.on('inv', this._onInv.bind(this))
     this.peers.on('tx', this._onTx.bind(this))
@@ -29,11 +26,7 @@ class Inventory extends EventEmitter {
     this.interval = setInterval(this._removeOld.bind(this), ttl)
   }
 
-  _error (err) {
-    if (err) this.emit('error', err)
-  }
-
-  _onInv (items, peer = this.peer) {
+  _onInv (items, peer = this.peers) {
     var getData = []
     for (let item of items) {
       if (item.type !== INV.MSG_TX) continue
@@ -47,16 +40,13 @@ class Inventory extends EventEmitter {
     }
   }
 
-  _onTx (tx, peer = this.peer) {
+  _onTx (tx, peer = this.peers) {
     var hash = getHash(tx.getHash())
     delete this.requesting[hash]
     if (this.data.has(hash)) return
-    this._add(tx, false, (err, valid) => {
-      if (err) return this._error(err)
-      if (this.verify && !valid) return
-      this.emit('tx', tx, peer)
-      this.emit(`tx:${hash}`, tx, peer)
-    })
+    this.add(tx, false)
+    this.emit('tx', tx, peer)
+    this.emit(`tx:${hash}`, tx, peer)
   }
 
   _removeOld () {
@@ -66,34 +56,18 @@ class Inventory extends EventEmitter {
     this.lastCount = this.data.length
   }
 
-  _add (data, skipVerify, cb) {
-    var announce = () => {
-      this.peers.send('inv', [
-        { hash: data.getHash(), type: INV.MSG_BLOCK }
-      ])
-    }
+  add (data, announce = true) {
     var hash = getHash(data.getHash())
+    if (this.data.has(hash)) return
     this.data.push(hash, data)
-
-    var verify = this.verify
-    if (!verify || skipVerify) {
-      // if there was no verify function provided, always fail
-      // if skipVerify is true, always pass
-      verify = (data, cb) => cb(null, skipVerify)
-    }
-    verify(data, (err, valid) => {
-      if (err) return cb(err)
-      if (valid) announce()
-      cb(err, valid)
-    })
+    if (!announce) return
+    this.peers.send('inv', [
+      { hash: data.getHash(), type: INV.MSG_TX }
+    ])
   }
 
   get (hash) {
-    return this.data.get(hash)
-  }
-
-  add (data, cb = this._error) {
-    this._add(data, true, cb)
+    return this.data.get(getHash(hash))
   }
 
   close () {
