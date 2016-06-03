@@ -1,6 +1,6 @@
 {
   "name": "bitcoin-inventory",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Exchange transactions with peers",
   "main": "index.js",
   "scripts": {
