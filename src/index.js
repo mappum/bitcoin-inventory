@@ -15,7 +15,7 @@ class Inventory extends EventEmitter {
       throw new Error('Must provide "peers" argument')
     }
     super()
-    var ttl = opts.ttl != null ? opts.ttl : 2 * 60 * 1000
+    this.ttl = opts.ttl != null ? opts.ttl : 2 * 60 * 1000
     this.peers = peers
     this.data = new MapDeque()
     this.requesting = {}
@@ -25,7 +25,6 @@ class Inventory extends EventEmitter {
     this.peers.on('getdata', this._onGetdata.bind(this))
 
     this.lastCount = 0
-    this.interval = setInterval(this._removeOld.bind(this), ttl)
   }
 
   _onInv (items, peer = this.peers) {
@@ -67,9 +66,17 @@ class Inventory extends EventEmitter {
       this.data.shift()
     }
     this.lastCount = this.data.length
+    if (this.data.length === 0) {
+      this.timeout = null
+    } else {
+      this.timeout = setTimeout(this._removeOld.bind(this), this.ttl)
+    }
   }
 
   _add (tx, broadcast) {
+    if (!this.timeout) {
+      this.timeout = setTimeout(this._removeOld.bind(this), this.ttl)
+    }
     var hashBuf = tx.getHash()
     var hash = getHash(hashBuf)
     if (!this.data.has(hash)) {
@@ -96,7 +103,7 @@ class Inventory extends EventEmitter {
   }
 
   close () {
-    clearInterval(this.interval)
+    clearTimeout(this.timeout)
     // TODO: stop listening to peers
   }
 }
