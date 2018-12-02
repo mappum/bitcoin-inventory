@@ -1,10 +1,13 @@
 'use strict'
 
-var EventEmitter = require('events')
-var INV = require('bitcoin-protocol').constants.inventory
-var MapDeque = require('map-deque')
-var old = require('old')
-var reverse = require('buffer-reverse')
+const EventEmitter = require('events')
+const protocol = require('bitcoin-protocol')
+const MapDeque = require('map-deque')
+const old = require('old')
+const createHash = require('create-hash')
+
+const INV = protocol.constants.inventory
+const encodeTx = protocol.types.transaction.encode
 
 // TODO: prevent DoS (e.g. rate limiting, cap on stored data)
 // TODO: add optional tx verification (user-provided function), and broadcast valid txs
@@ -15,7 +18,7 @@ class Inventory extends EventEmitter {
       throw new Error('Must provide "peers" argument')
     }
     super()
-    var ttl = opts.ttl != null ? opts.ttl : 2 * 60 * 1000
+    let ttl = opts.ttl != null ? opts.ttl : 2 * 60 * 1000
     this.peers = peers
     this.data = new MapDeque()
     this.requesting = {}
@@ -30,11 +33,12 @@ class Inventory extends EventEmitter {
   }
 
   _onInv (items, peer = this.peers) {
-    var getData = []
+    let getData = []
     for (let item of items) {
       if (item.type !== INV.MSG_TX) continue
-      let hash = getHash(item.hash)
+      let hash = hashToString(item.hash)
       if (this.requesting[hash] || this.data.has(hash)) continue
+      item.hash = item.hash.reverse()
       getData.push(item)
       this.requesting[hash] = true
     }
@@ -44,7 +48,7 @@ class Inventory extends EventEmitter {
   }
 
   _onTx (tx, peer = this.peers) {
-    var hash = getHash(tx.getHash())
+    let hash = hashToString(getTxHash(tx))
     delete this.requesting[hash]
     if (this.data.has(hash)) return
     this._add(tx, false)
@@ -55,7 +59,7 @@ class Inventory extends EventEmitter {
   _onGetdata (items, peer = this.peers) {
     for (let item of items) {
       if (item.type !== INV.MSG_TX) continue
-      let hash = getHash(item.hash)
+      let hash = hashToString(item.hash)
       if (!this.data.has(hash)) continue
       let entry = this.data.get(hash)
       if (!entry.broadcast) continue
@@ -71,8 +75,8 @@ class Inventory extends EventEmitter {
   }
 
   _add (tx, broadcast) {
-    var hashBuf = tx.getHash()
-    var hash = getHash(hashBuf)
+    let hashBuf = getTxHash(tx)
+    let hash = hashToString(hashBuf)
     if (!this.data.has(hash)) {
       this.data.push(hash, { tx, broadcast })
     } else {
@@ -87,12 +91,12 @@ class Inventory extends EventEmitter {
 
   _sendInv (tx, peer) {
     peer.send('inv', [
-      { hash: tx.getHash(), type: INV.MSG_TX }
+      { hash: getTxHash(tx), type: INV.MSG_TX }
     ])
   }
 
   get (hash) {
-    var entry = this.data.get(getHash(hash))
+    let entry = this.data.get(hashToString(hash))
     if (entry) return entry.tx
   }
 
@@ -102,8 +106,17 @@ class Inventory extends EventEmitter {
   }
 }
 
-function getHash (hash) {
-  return reverse(hash).toString('hex')
+function hashToString (hash) {
+  return hash.reverse().toString('hex')
+}
+
+function getTxHash (tx) {
+  let txBytes = encodeTx(tx)
+  return sha256(sha256(txBytes))
+}
+
+function sha256 (data) {
+  return createHash('sha256').update(data).digest()
 }
 
 module.exports = old(Inventory)
