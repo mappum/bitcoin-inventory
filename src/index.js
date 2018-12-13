@@ -15,7 +15,7 @@ const encodeTx = protocol.types.transaction.encode
 class Inventory extends EventEmitter {
   constructor (peers, opts = {}) {
     if (!peers) {
-      throw new Error('Must provide "peers" argument')
+      throw Error('Must provide "peers" argument')
     }
     super()
     let ttl = opts.ttl != null ? opts.ttl : 2 * 60 * 1000
@@ -26,6 +26,7 @@ class Inventory extends EventEmitter {
     this.peers.on('inv', this._onInv.bind(this))
     this.peers.on('tx', this._onTx.bind(this))
     this.peers.on('getdata', this._onGetdata.bind(this))
+    this.peers.on('reject', this._onReject.bind(this))
 
     this.lastCount = 0
     this.interval = setInterval(this._removeOld.bind(this), ttl)
@@ -38,7 +39,7 @@ class Inventory extends EventEmitter {
       if (item.type !== INV.MSG_TX) continue
       let hash = hashToString(item.hash)
       if (this.requesting[hash] || this.data.has(hash)) continue
-      item.hash = item.hash.reverse()
+      item.hash = reverse(item.hash)
       getData.push(item)
       this.requesting[hash] = true
     }
@@ -48,12 +49,12 @@ class Inventory extends EventEmitter {
   }
 
   _onTx (tx, peer = this.peers) {
-    let hash = hashToString(getTxHash(tx))
-    delete this.requesting[hash]
-    if (this.data.has(hash)) return
+    let hash = getTxHash(tx)
+    let hashStr = hashToString(hash)
+    delete this.requesting[hashStr]
+    if (this.data.has(hashStr)) return
     this._add(tx, false)
     this.emit('tx', tx, peer)
-    this.emit(`tx:${hash}`, tx, peer)
   }
 
   _onGetdata (items, peer = this.peers) {
@@ -65,6 +66,10 @@ class Inventory extends EventEmitter {
       if (!entry.broadcast) continue
       peer.send('tx', this.data.get(hash).tx)
     }
+  }
+
+  _onReject (message, peer = this.peers) {
+    console.log('got reject', message)
   }
 
   _removeOld () {
@@ -106,8 +111,14 @@ class Inventory extends EventEmitter {
   }
 }
 
+function reverse (buf) {
+  let clone = Buffer.allocUnsafe(buf.length)
+  buf.copy(clone)
+  return clone.reverse()
+}
+
 function hashToString (hash) {
-  return hash.reverse().toString('hex')
+  return reverse(hash).toString('base64')
 }
 
 function getTxHash (tx) {
@@ -120,3 +131,5 @@ function sha256 (data) {
 }
 
 module.exports = old(Inventory)
+module.exports.getTxHash = getTxHash
+module.exports.reverse = reverse
