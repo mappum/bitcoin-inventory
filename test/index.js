@@ -6,7 +6,7 @@ const INV = require('bitcoin-protocol').constants.inventory
 const wrapEvents = require('event-cleanup')
 const test = require('tape')
 const Inventory = require('..')
-const { getTxHash, reverse } = Inventory
+const { getTxHash } = Inventory
 
 test('create Inventory', function (t) {
   t.test('no peers', function (t) {
@@ -56,7 +56,7 @@ test('inv handling', function (t) {
       t.equal(command, 'getdata', 'sent getdata')
       t.ok(Array.isArray(message), 'message is an array')
       t.equal(message.length, 1, 'message has length 1')
-      t.equal(message[0].hash.toString('base64'), reverse(hash).toString('base64'), 'correct hash')
+      t.equal(message[0].hash.toString('base64'), hash.toString('base64'), 'correct hash')
       t.equal(message[0].type, INV.MSG_TX, 'correct inv type')
       t.end()
     })
@@ -73,8 +73,8 @@ test('inv handling', function (t) {
       t.equal(command, 'getdata', 'sent getdata')
       t.ok(Array.isArray(message), 'message is an array')
       t.equal(message.length, 2, 'message has length 2')
-      t.equal(message[0].hash.toString('base64'), reverse(hashes[0]).toString('base64'), 'correct hash')
-      t.equal(message[1].hash.toString('base64'), reverse(hashes[1]).toString('base64'), 'correct hash')
+      t.equal(message[0].hash.toString('base64'), hashes[0].toString('base64'), 'correct hash')
+      t.equal(message[1].hash.toString('base64'), hashes[1].toString('base64'), 'correct hash')
       t.equal(message[0].type, INV.MSG_TX, 'correct inv type')
       t.equal(message[1].type, INV.MSG_TX, 'correct inv type')
       t.end()
@@ -178,7 +178,7 @@ test('tx handling', function (t) {
     peerEvents.once('send', function (command, message) {
       t.equal(command, 'getdata', 'sent getdata')
       t.equal(message.length, 1, 'getdata has length 1')
-      t.equal(message[0].hash.toString('base64'), reverse(hash).toString('base64'), 'getdata has correct hash')
+      t.equal(message[0].hash.toString('base64'), hash.toString('base64'), 'getdata has correct hash')
       peerEvents.once('send', function (command, message) {
         t.fail('should not have sent message')
       })
