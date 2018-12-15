@@ -39,7 +39,6 @@ class Inventory extends EventEmitter {
       if (item.type !== INV.MSG_TX) continue
       let hash = hashToString(item.hash)
       if (this.requesting[hash] || this.data.has(hash)) continue
-      item.hash = reverse(item.hash)
       getData.push(item)
       this.requesting[hash] = true
     }
@@ -132,4 +131,3 @@ function sha256 (data) {
 
 module.exports = old(Inventory)
 module.exports.getTxHash = getTxHash
-module.exports.reverse = reverse
