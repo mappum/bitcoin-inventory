@@ -48,7 +48,7 @@ class Inventory extends EventEmitter {
   }
 
   _onTx (tx, peer = this.peers) {
-    let hash = getTxHash(tx)
+    let hash = getNonWitnessTxHash(tx)
     let hashStr = hashToString(hash)
     delete this.requesting[hashStr]
     if (this.data.has(hashStr)) return
@@ -58,7 +58,7 @@ class Inventory extends EventEmitter {
 
   _onGetdata (items, peer = this.peers) {
     for (let item of items) {
-      if (item.type !== INV.MSG_TX) continue
+      if (!(item.type & INV.MSG_TX)) continue
       let hash = hashToString(item.hash)
       if (!this.data.has(hash)) continue
       let entry = this.data.get(hash)
@@ -79,7 +79,7 @@ class Inventory extends EventEmitter {
   }
 
   _add (tx, broadcast) {
-    let hashBuf = getTxHash(tx)
+    let hashBuf = getNonWitnessTxHash(tx)
     let hash = hashToString(hashBuf)
     if (!this.data.has(hash)) {
       this.data.push(hash, { tx, broadcast })
@@ -95,7 +95,7 @@ class Inventory extends EventEmitter {
 
   _sendInv (tx, peer) {
     peer.send('inv', [
-      { hash: getTxHash(tx), type: INV.MSG_TX }
+      { hash: getNonWitnessTxHash(tx), type: INV.MSG_TX }
     ])
   }
 
@@ -120,6 +120,17 @@ function hashToString (hash) {
   return reverse(hash).toString('base64')
 }
 
+function getNonWitnessTxHash (tx) {
+  // delete witnesses
+  tx = Object.assign({}, tx)
+  tx.ins = tx.ins.map((input) => {
+    input = Object.assign({}, input)
+    delete input.witness
+    return input
+  })
+  return getTxHash(tx)
+}
+
 function getTxHash (tx) {
   let txBytes = encodeTx(tx)
   return sha256(sha256(txBytes))
@@ -131,3 +142,4 @@ function sha256 (data) {
 
 module.exports = old(Inventory)
 module.exports.getTxHash = getTxHash
+module.exports.getNonWitnessTxHash = getNonWitnessTxHash
