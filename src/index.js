@@ -1,5 +1,6 @@
 'use strict'
 
+const debug = require('debug')('bitcoin-inventory')
 const EventEmitter = require('events')
 const protocol = require('bitcoin-protocol')
 const MapDeque = require('map-deque')
@@ -68,7 +69,9 @@ class Inventory extends EventEmitter {
   }
 
   _onReject (message, peer = this.peers) {
-    console.log('got reject', message)
+    debug('got reject', message)
+    // TODO: if most peers give us the same reject code,
+    //       emit it as an error
   }
 
   _removeOld () {
